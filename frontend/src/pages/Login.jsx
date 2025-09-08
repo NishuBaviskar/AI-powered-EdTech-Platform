@@ -1,6 +1,6 @@
 import { useState } from 'react';
-// BEFORE: import axios from 'axios';
-import api from '../api'; // AFTER: We now use our centralized, smart API client.
+// This import is the key. We are using our smart api client, not the generic axios.
+import api from '../api';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
