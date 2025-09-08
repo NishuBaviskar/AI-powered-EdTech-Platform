@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { FiCheckCircle, FiSearch, FiBookOpen, FiLogIn } from 'react-icons/fi';
 
 const RecentActivity = ({ activities, loading }) => {
-    // This guard clause makes the component resilient to bad data
+    // --- THIS IS THE FIX ---
+    // This component will now render a safe message if the activities prop is not a valid array, preventing a crash.
     if (!loading && (!activities || !Array.isArray(activities))) {
         return (
             <Card title="Recent Activity">
@@ -41,9 +42,7 @@ const RecentActivity = ({ activities, loading }) => {
                                 transition={{ delay: index * 0.1 }}
                                 className="flex items-center p-3 hover:bg-gray-50 rounded-md"
                             >
-                                <div className={`p-2 rounded-full mr-4 ${color}`}>
-                                    <Icon className="w-5 h-5" />
-                                </div>
+                                <div className={`p-2 rounded-full mr-4 ${color}`}><Icon className="w-5 h-5" /></div>
                                 <div className="flex-grow">
                                     <p className="text-sm capitalize font-medium text-textPrimary">
                                         {item.activity_type.replace(/_/g, ' ')}
