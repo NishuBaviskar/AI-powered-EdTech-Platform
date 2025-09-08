@@ -19,11 +19,17 @@ const Register = () => {
         setLoading(true);
         try {
             const res = await axios.post('/api/auth/register', formData);
-            localStorage.setItem('token', res.data.token);
-            toast.success('Registration successful!');
-            navigate('/dashboard');
+            
+            if (res.data && res.data.token) {
+                localStorage.setItem('token', res.data.token);
+                toast.success('Registration successful!');
+                navigate('/dashboard');
+            } else {
+                throw new Error("Token was not received from server after registration.");
+            }
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Registration failed.');
+            console.error("Registration failed:", err);
+            toast.error(err.response?.data?.message || 'Registration failed. Please try again.');
         } finally {
             setLoading(false);
         }
