@@ -3,7 +3,15 @@ import { motion } from 'framer-motion';
 import { FiCheckCircle, FiSearch, FiBookOpen, FiLogIn } from 'react-icons/fi';
 
 const RecentActivity = ({ activities, loading }) => {
-
+    // This guard clause makes the component resilient to bad data
+    if (!loading && (!activities || !Array.isArray(activities))) {
+        return (
+            <Card title="Recent Activity">
+                <p className="text-sm text-textSecondary text-center py-4">Could not load activity.</p>
+            </Card>
+        );
+    }
+    
     const getIconInfo = (type) => {
         switch (type) {
             case 'quiz_completed':
@@ -23,7 +31,7 @@ const RecentActivity = ({ activities, loading }) => {
         <Card title="Recent Activity">
              <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
                 {loading ? <p>Loading activity...</p> : (
-                    activities?.length > 0 ? activities.map((item, index) => {
+                    activities.length > 0 ? activities.map((item, index) => {
                         const { Icon, color } = getIconInfo(item.activity_type);
                         return (
                             <motion.div
