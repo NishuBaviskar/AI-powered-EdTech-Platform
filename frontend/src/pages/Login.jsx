@@ -20,12 +20,13 @@ const Login = () => {
         try {
             const res = await axios.post('/api/auth/login', formData);
             
-            // This check ensures we don't proceed if the backend somehow fails to send a token
+            // This check is still good practice to ensure the token exists before proceeding
             if (res.data && res.data.token) {
                 localStorage.setItem('token', res.data.token);
                 toast.success('Logged in successfully!');
                 navigate('/dashboard');
             } else {
+                // This will only trigger if the backend has a catastrophic failure
                 throw new Error("Token was not received from server.");
             }
         } catch (err) {
