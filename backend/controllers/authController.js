@@ -33,61 +33,57 @@ export const register = async (req, res) => {
     }
 };
 
-
-// --- LOG IN AN EXISTING USER (WITH FULL DEBUGGING) ---
+// --- LOG IN AN EXISTING USER (FINAL, CORRECTED VERSION) ---
 export const login = async (req, res) => {
-    // DEBUG STEP 1: Log when the endpoint is hit and what data it receives.
     console.log("--- BACKEND: /api/auth/login endpoint hit ---");
-    console.log("Request Body Received:", req.body);
-    
     const { email, password } = req.body;
 
-    // A check to make sure data arrived from the frontend
     if (!email || !password) {
-        console.log("--- BACKEND ERROR: Email or password was missing in the request. ---");
         return res.status(400).json({ message: "Email and password are required." });
     }
 
     try {
         const [user] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
         if (user.length === 0) {
-            console.log(`--- BACKEND: Login failed for ${email}. Reason: User not found. ---`);
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
         const isMatch = await bcrypt.compare(password, user[0].password);
         if (!isMatch) {
-            console.log(`--- BACKEND: Login failed for ${email}. Reason: Password incorrect. ---`);
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        console.log(`--- BACKEND: Login successful for ${email}. Preparing to generate token. ---`);
+        console.log(`--- BACKEND: Login successful for ${email}. Generating token... ---`);
         const payload = { user: { id: user[0].id } };
         
-        // --- THIS IS THE CRITICAL DEBUGGING STEP for token generation ---
-        jwt.sign(
-            payload,
-            process.env.JWT_SECRET,
-            { expiresIn: '5h' },
-            (err, token) => {
-                if (err) {
-                    // If there's an error signing the token, we will see it here.
-                    console.error("--- BACKEND CRITICAL ERROR: JWT Signing Failed ---", err);
-                    return res.status(500).send('Server error during token generation');
+        // --- THIS IS THE CRITICAL FIX ---
+        // We wrap jwt.sign in a new Promise to make it await-able.
+        const token = await new Promise((resolve, reject) => {
+            jwt.sign(
+                payload,
+                process.env.JWT_SECRET,
+                { expiresIn: '5h' },
+                (err, generatedToken) => {
+                    if (err) {
+                        // If there's an error during signing, reject the promise
+                        console.error("--- BACKEND CRITICAL ERROR: JWT Signing Failed ---", err);
+                        return reject(err);
+                    }
+                    // If signing is successful, resolve the promise with the token
+                    resolve(generatedToken);
                 }
+            );
+        });
 
-                // If signing is successful, we log the token and send it.
-                console.log("--- BACKEND: Token generated successfully. Sending to client. ---");
-                console.log("Generated Token (first 15 chars):", token ? token.substring(0, 15) : "Token is NULL or UNDEFINED");
-                res.json({ token });
-            }
-        );
+        // This code will now only run AFTER the token has been successfully generated.
+        console.log("--- BACKEND: Token generated. Sending to client. ---");
+        res.json({ token });
+
     } catch (err) {
-        console.error("--- BACKEND CRITICAL ERROR in login controller ---", err.message);
+        console.error("--- BACKEND CRITICAL ERROR in login controller ---", err);
         res.status(500).send('Server error during login');
     }
 };
-
 
 // --- AI CHATBOT POWERED BY GEMINI API ---
 export const chatbot = async (req, res) => {
