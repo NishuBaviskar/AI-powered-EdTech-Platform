@@ -17,45 +17,20 @@ const Login = () => {
     const onSubmit = async e => {
         e.preventDefault();
         setLoading(true);
-
-        // DEBUG STEP 1: Log the data being sent.
-        console.log("--- FRONTEND: Attempting to log in with data: ---", formData);
-        
         try {
-            // DEBUG STEP 2: Log that the request is being sent.
-            console.log("--- FRONTEND: Sending request to /api/auth/login ---");
             const res = await axios.post('/api/auth/login', formData);
-
-            // DEBUG STEP 3: Log the entire raw response from the backend for inspection.
-            console.log("--- FRONTEND: Received response from backend. Full response object: ---");
-            console.dir(res);
-            console.log("--- FRONTEND: The data from the backend is: ---", res.data);
-
-            // Check if a valid token was received before trying to use it.
+            
+            // This check ensures we don't proceed if the backend somehow fails to send a token
             if (res.data && res.data.token) {
-                console.log("--- FRONTEND: Token found in response. Saving to localStorage. ---");
                 localStorage.setItem('token', res.data.token);
                 toast.success('Logged in successfully!');
                 navigate('/dashboard');
             } else {
-                // This will catch the "token undefined" error before it happens.
-                console.error("--- FRONTEND CRITICAL ERROR: Backend response is OK, but token is missing! ---", res.data);
-                toast.error('Login succeeded but a token was not provided by the server.');
+                throw new Error("Token was not received from server.");
             }
         } catch (err) {
-            // DEBUG STEP 4: Log the exact error if the API call fails.
-            console.error("--- FRONTEND: Caught an ERROR during login API call ---");
-            if (err.response) {
-                console.error("Error Data:", err.response.data);
-                console.error("Error Status:", err.response.status);
-                toast.error(err.response.data.message || 'Login failed. Please check credentials.');
-            } else if (err.request) {
-                console.error("Error Request:", err.request);
-                toast.error('No response from server. Is the backend running?');
-            } else {
-                console.error('Error Message:', err.message);
-                toast.error('An unexpected error occurred.');
-            }
+            console.error("Login failed:", err);
+            toast.error(err.response?.data?.message || 'Login failed. Please try again.');
         } finally {
             setLoading(false);
         }
