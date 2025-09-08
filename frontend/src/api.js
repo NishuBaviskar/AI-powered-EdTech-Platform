@@ -2,28 +2,27 @@ import axios from 'axios';
 
 // Create an instance of axios
 const api = axios.create({
-    // The base URL for all our API calls will be '/api'
-    // The Vite proxy will handle forwarding this to http://localhost:3001
-    baseURL: '/api',
-    headers: {
-        'Content-Type': 'application/json'
-    }
+  // This line is the most important part of the fix.
+  // In production, it will use the URL we set on Render.
+  // In local development, it will default to the proxy '/api'.
+  baseURL: import.meta.env.VITE_API_URL || '/api',
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
 
-// IMPORTANT: This "interceptor" runs before each request is sent.
-// It checks if a token exists in localStorage and, if so, adds it
-// to the Authorization header.
+// This interceptor automatically attaches the login token to every request.
 api.interceptors.request.use(
-    config => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers['Authorization'] = `Bearer ${token}`;
-        }
-        return config;
-    },
-    error => {
-        return Promise.reject(error);
+  config => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
     }
+    return config;
+  },
+  error => {
+    return Promise.reject(error);
+  }
 );
 
 export default api;
