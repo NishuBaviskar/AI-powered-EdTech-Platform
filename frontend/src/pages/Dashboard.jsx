@@ -6,7 +6,7 @@ import EngagementSummary from '../components/Dashboard/EngagementSummary';
 import WeeklyActivityChart from '../components/Dashboard/WeeklyActivityChart';
 import RecentActivity from '../components/Dashboard/RecentActivity';
 import LiveNews from '../components/Dashboard/LiveNews';
-import Card from '../components/UI/Card'; // Import Card for the loader
+import Card from '../components/UI/Card';
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -27,10 +27,16 @@ const Dashboard = () => {
         const fetchDashboardData = async () => {
             try {
                 const res = await api.get('/dashboard/stats');
-                setDashboardData(res.data);
+                // Only set data if the response has the expected structure
+                if (res.data && res.data.keyStats && res.data.chartData && res.data.recentActivities) {
+                    setDashboardData(res.data);
+                } else {
+                    // If the server sends malformed data, we treat it as an error
+                    throw new Error("Received malformed data from server");
+                }
             } catch (error) {
                 console.error("Failed to load dashboard data", error);
-                // On error, dashboardData remains null, which our child components will handle.
+                // On any error, dashboardData will remain null
             } finally {
                 setLoading(false);
             }
@@ -38,26 +44,34 @@ const Dashboard = () => {
         fetchDashboardData();
     }, []);
 
-    // --- THIS IS THE BULLETPROOF LOADING/ERROR STATE ---
-    // If we are loading, show a full-page skeleton.
-    // If there's no data after loading, show a clear error message.
+    // --- THIS IS THE "GATEKEEPER" THAT PREVENTS THE CRASH ---
+    // If we are loading, it shows a full-page skeleton loader.
+    // If loading is finished but dashboardData is still null (due to an error),
+    // it shows a clear error message.
     if (loading || !dashboardData) {
         return (
             <div className="space-y-8">
+                {/* Skeleton Loader UI */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 animate-pulse">
                     <div className="h-32 bg-gray-200 rounded-2xl"></div>
                     <div className="h-32 bg-gray-200 rounded-2xl"></div>
                     <div className="h-32 bg-gray-200 rounded-2xl"></div>
                 </div>
                 <div className="h-96 bg-gray-200 rounded-2xl animate-pulse"></div>
+
+                {/* Error Message UI */}
                 {!loading && !dashboardData && (
-                    <Card><p className="text-center text-red-500">Failed to load dashboard statistics. Please try refreshing the page.</p></Card>
+                    <Card>
+                        <p className="text-center text-red-500 font-semibold">
+                            Failed to load dashboard statistics. Please try refreshing the page.
+                        </p>
+                    </Card>
                 )}
             </div>
         );
     }
 
-    // Only render the real dashboard if data exists
+    // --- THIS CODE ONLY RUNS IF THE DATA IS VALID AND LOADED ---
     return (
         <motion.div
             variants={containerVariants}
