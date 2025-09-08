@@ -3,7 +3,6 @@ import { format, subDays } from 'date-fns';
 
 export const getDashboardStats = async (req, res) => {
     const userId = req.user.id;
-    // Get today's date in YYYY-MM-DD format, which matches the database
     const today = format(new Date(), 'yyyy-MM-dd');
 
     try {
@@ -13,7 +12,6 @@ export const getDashboardStats = async (req, res) => {
             [userId, today]
         );
 
-        // Fetch recent activities separately as they are always live
         const [recentActivities] = await pool.query(
             `SELECT activity_type, details, timestamp FROM user_activity WHERE user_id = ? ORDER BY timestamp DESC LIMIT 5`,
             [userId]
@@ -29,22 +27,20 @@ export const getDashboardStats = async (req, res) => {
             });
         }
         
-        // --- STEP 3: If no snapshot exists, calculate everything from scratch ---
         console.log(`No snapshot found for user ${userId} on ${today}. Calculating new stats...`);
 
-        const [activities] = await pool.query(
-            `SELECT activity_type, timestamp FROM user_activity WHERE user_id = ? AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)`,
-            [userId]
-        );
-        const [quizHistory] = await pool.query(
-            `SELECT score, total_questions, timestamp FROM quiz_history WHERE user_id = ? AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)`,
-            [userId]
-        );
-        const [chatHistory] = await pool.query(
-            `SELECT timestamp FROM chatbot_history WHERE user_id = ? AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)`,
-            [userId]
-        );
+        // --- STEP 3: Calculate everything from scratch with resilient queries ---
+        // We wrap each query in a .catch() block. If one fails, it won't crash the entire process.
+        const [activitiesRes, quizHistoryRes, chatHistoryRes] = await Promise.all([
+            pool.query(`SELECT activity_type, timestamp FROM user_activity WHERE user_id = ? AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)`, [userId]).catch(e => { console.error("Activity query failed:", e.message); return [[]]; }),
+            pool.query(`SELECT score, total_questions, timestamp FROM quiz_history WHERE user_id = ? AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)`, [userId]).catch(e => { console.error("Quiz history query failed:", e.message); return [[]]; }),
+            pool.query(`SELECT timestamp FROM chatbot_history WHERE user_id = ? AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)`, [userId]).catch(e => { console.error("Chat history query failed:", e.message); return [[]]; })
+        ]);
 
+        const activities = activitiesRes[0];
+        const quizHistory = quizHistoryRes[0];
+        const chatHistory = chatHistoryRes[0];
+        
         // Calculate chart data
         const chartData = {};
         for (let i = 6; i >= 0; i--) {
@@ -85,15 +81,9 @@ export const getDashboardStats = async (req, res) => {
         );
         console.log(`New dashboard snapshot saved for user ${userId} on ${today}.`);
 
-        // Finally, return the newly calculated data
-        res.json({
-            keyStats,
-            chartData: finalChartData,
-            recentActivities
-        });
-
+        res.json({ keyStats, chartData: finalChartData, recentActivities });
     } catch (err) {
-        console.error("Error in getDashboardStats controller:", err.message);
+        console.error("CRITICAL ERROR in getDashboardStats controller:", err.message);
         res.status(500).send('Server Error');
     }
 };
