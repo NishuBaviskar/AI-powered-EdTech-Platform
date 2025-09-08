@@ -3,6 +3,19 @@ import { FiActivity } from 'react-icons/fi';
 import Card from '../UI/Card';
 
 const WeeklyActivityChart = ({ data }) => {
+    // --- THIS IS THE BULLETPROOF FIX ---
+    // If the data is not a valid array, do not attempt to render the chart.
+    if (!Array.isArray(data) || data.length === 0) {
+        return (
+            <Card>
+                <h3 className="text-xl font-semibold text-textPrimary mb-4">Weekly Activity Breakdown</h3>
+                <div className="flex items-center justify-center h-72 bg-gray-50 rounded-lg">
+                    <p className="text-textSecondary">Not enough data to display chart.</p>
+                </div>
+            </Card>
+        );
+    }
+
     return (
         <Card>
             <div className="flex justify-between items-center mb-4">
