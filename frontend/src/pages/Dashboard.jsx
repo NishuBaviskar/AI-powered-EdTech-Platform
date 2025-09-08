@@ -18,7 +18,8 @@ const itemVariants = {
 };
 
 const Dashboard = () => {
-    // We initialize state with a default "shape" to prevent crashes
+    // --- THIS IS THE FIX ---
+    // We initialize state with a default structure to prevent crashes
     const [dashboardData, setDashboardData] = useState({
         keyStats: null,
         chartData: [],
@@ -33,7 +34,7 @@ const Dashboard = () => {
                 setDashboardData(res.data);
             } catch (error) {
                 console.error("Failed to load dashboard data", error);
-                // On error, the state keeps its safe default shape
+                // On error, the state keeps its safe default shape, preventing a crash
             } finally {
                 setLoading(false);
             }
@@ -51,7 +52,6 @@ const Dashboard = () => {
             <motion.div variants={itemVariants}>
                 <EngagementSummary stats={dashboardData?.keyStats} loading={loading} />
             </motion.div>
-
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <motion.div variants={itemVariants} className="lg:col-span-2">
                     <WeeklyActivityChart data={dashboardData?.chartData} />
@@ -60,7 +60,6 @@ const Dashboard = () => {
                     <RecentActivity activities={dashboardData?.recentActivities} loading={loading} />
                 </motion.div>
             </div>
-
             <motion.div variants={itemVariants}>
                 <LiveNews />
             </motion.div>
