@@ -3,26 +3,21 @@ import jwt from 'jsonwebtoken';
 import pool from '../models/db.js';
 import fetch from 'node-fetch';
 
-// --- REGISTER A NEW USER ---
+// The register function does not need any changes.
 export const register = async (req, res) => {
     const { username, email, password } = req.body;
-    
     if (!username || !email || !password) {
         return res.status(400).json({ message: "Username, email, and password are required." });
     }
-
     try {
         const [existingUser] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
         if (existingUser.length > 0) {
             return res.status(400).json({ message: 'User with this email already exists' });
         }
-
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-
         const [newUser] = await pool.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, hashedPassword]);
         const payload = { user: { id: newUser.insertId } };
-
         jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, token) => {
             if (err) throw err;
             res.status(201).json({ token });
@@ -33,9 +28,9 @@ export const register = async (req, res) => {
     }
 };
 
-// --- LOG IN AN EXISTING USER (FINAL, CORRECTED VERSION) ---
+
+// --- LOG IN AN EXISTING USER (FINAL, PERMANENTLY FIXED VERSION) ---
 export const login = async (req, res) => {
-    console.log("--- BACKEND: /api/auth/login endpoint hit ---");
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -53,11 +48,10 @@ export const login = async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        console.log(`--- BACKEND: Login successful for ${email}. Generating token... ---`);
         const payload = { user: { id: user[0].id } };
         
         // --- THIS IS THE CRITICAL FIX ---
-        // We wrap jwt.sign in a new Promise to make it await-able.
+        // We wrap jwt.sign in a new Promise to make it compatible with async/await.
         const token = await new Promise((resolve, reject) => {
             jwt.sign(
                 payload,
@@ -65,17 +59,17 @@ export const login = async (req, res) => {
                 { expiresIn: '5h' },
                 (err, generatedToken) => {
                     if (err) {
-                        // If there's an error during signing, reject the promise
+                        // If there's an error during signing, we reject the promise.
                         console.error("--- BACKEND CRITICAL ERROR: JWT Signing Failed ---", err);
                         return reject(err);
                     }
-                    // If signing is successful, resolve the promise with the token
+                    // If signing is successful, we resolve the promise with the token.
                     resolve(generatedToken);
                 }
             );
         });
 
-        // This code will now only run AFTER the token has been successfully generated.
+        // This code is now GUARANTEED to run only AFTER the token has been created.
         console.log("--- BACKEND: Token generated. Sending to client. ---");
         res.json({ token });
 
@@ -84,6 +78,7 @@ export const login = async (req, res) => {
         res.status(500).send('Server error during login');
     }
 };
+
 
 // --- AI CHATBOT POWERED BY GEMINI API ---
 export const chatbot = async (req, res) => {
@@ -112,14 +107,11 @@ export const chatbot = async (req, res) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-
         const responseData = await apiResponse.json();
-
         if (!apiResponse.ok || !responseData.candidates) {
             console.error("Gemini API Error (Chatbot):", responseData);
             throw new Error(`API call failed. Status: ${apiResponse.status}`);
         }
-
         const reply = responseData.candidates[0].content.parts[0].text;
         res.json({ reply });
     } catch (err) {
