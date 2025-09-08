@@ -18,10 +18,14 @@ const itemVariants = {
 };
 
 const Dashboard = () => {
-    const [dashboardData, setDashboardData] = useState(null);
+    // We initialize state with a default "shape" to prevent crashes
+    const [dashboardData, setDashboardData] = useState({
+        keyStats: null,
+        chartData: [],
+        recentActivities: []
+    });
     const [loading, setLoading] = useState(true);
 
-    // This single useEffect fetches all the necessary data for the dashboard
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
@@ -29,6 +33,7 @@ const Dashboard = () => {
                 setDashboardData(res.data);
             } catch (error) {
                 console.error("Failed to load dashboard data", error);
+                // On error, the state keeps its safe default shape
             } finally {
                 setLoading(false);
             }
@@ -43,24 +48,19 @@ const Dashboard = () => {
             animate="visible"
             className="space-y-8"
         >
-            {/* --- THE RESTORED ENGAGEMENT SUMMARY CARDS --- */}
             <motion.div variants={itemVariants}>
                 <EngagementSummary stats={dashboardData?.keyStats} loading={loading} />
             </motion.div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* --- THE NEW, DEDICATED ACTIVITY CHART --- */}
                 <motion.div variants={itemVariants} className="lg:col-span-2">
                     <WeeklyActivityChart data={dashboardData?.chartData} />
                 </motion.div>
-
-                {/* --- THE REDESIGNED RECENT ACTIVITY FEED --- */}
                 <motion.div variants={itemVariants} className="lg:col-span-1">
                     <RecentActivity activities={dashboardData?.recentActivities} loading={loading} />
                 </motion.div>
             </div>
 
-            {/* The Live News component remains */}
             <motion.div variants={itemVariants}>
                 <LiveNews />
             </motion.div>
