@@ -3,55 +3,28 @@ import jwt from 'jsonwebtoken';
 import pool from '../models/db.js';
 import fetch from 'node-fetch';
 
-// The register function does not need any changes.
+// --- REGISTER A NEW USER (FINAL, PERMANENTLY FIXED VERSION) ---
 export const register = async (req, res) => {
     const { username, email, password } = req.body;
+    
     if (!username || !email || !password) {
         return res.status(400).json({ message: "Username, email, and password are required." });
     }
+
     try {
         const [existingUser] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
         if (existingUser.length > 0) {
             return res.status(400).json({ message: 'User with this email already exists' });
         }
+
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
+
         const [newUser] = await pool.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, hashedPassword]);
         const payload = { user: { id: newUser.insertId } };
-        jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, token) => {
-            if (err) throw err;
-            res.status(201).json({ token });
-        });
-    } catch (err) {
-        console.error("--- BACKEND CRITICAL ERROR in register controller ---", err.message);
-        res.status(500).send('Server error during registration');
-    }
-};
 
-
-// --- LOG IN AN EXISTING USER (FINAL, PERMANENTLY FIXED VERSION) ---
-export const login = async (req, res) => {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required." });
-    }
-
-    try {
-        const [user] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-        if (user.length === 0) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
-
-        const isMatch = await bcrypt.compare(password, user[0].password);
-        if (!isMatch) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
-
-        const payload = { user: { id: user[0].id } };
-        
-        // --- THIS IS THE CRITICAL FIX ---
-        // We wrap jwt.sign in a new Promise to make it compatible with async/await.
+        // --- THIS IS THE CRITICAL FIX FOR THE REGISTER FUNCTION ---
+        // We apply the same Promise-based fix to ensure we await the token generation.
         const token = await new Promise((resolve, reject) => {
             jwt.sign(
                 payload,
@@ -59,20 +32,47 @@ export const login = async (req, res) => {
                 { expiresIn: '5h' },
                 (err, generatedToken) => {
                     if (err) {
-                        // If there's an error during signing, we reject the promise.
-                        console.error("--- BACKEND CRITICAL ERROR: JWT Signing Failed ---", err);
+                        console.error("--- BACKEND CRITICAL ERROR: JWT Signing Failed during registration ---", err);
                         return reject(err);
                     }
-                    // If signing is successful, we resolve the promise with the token.
                     resolve(generatedToken);
                 }
             );
         });
+        
+        // This is now GUARANTEED to run only after the token is created.
+        res.status(201).json({ token });
 
-        // This code is now GUARANTEED to run only AFTER the token has been created.
-        console.log("--- BACKEND: Token generated. Sending to client. ---");
+    } catch (err) {
+        console.error("--- BACKEND CRITICAL ERROR in register controller ---", err);
+        res.status(500).send('Server error during registration');
+    }
+};
+
+
+// --- LOG IN AN EXISTING USER (ALREADY CORRECTED) ---
+export const login = async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required." });
+    }
+    try {
+        const [user] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+        if (user.length === 0) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+        const isMatch = await bcrypt.compare(password, user[0].password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+        const payload = { user: { id: user[0].id } };
+        const token = await new Promise((resolve, reject) => {
+            jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, generatedToken) => {
+                if (err) return reject(err);
+                resolve(generatedToken);
+            });
+        });
         res.json({ token });
-
     } catch (err) {
         console.error("--- BACKEND CRITICAL ERROR in login controller ---", err);
         res.status(500).send('Server error during login');
@@ -80,7 +80,7 @@ export const login = async (req, res) => {
 };
 
 
-// --- AI CHATBOT POWERED BY GEMINI API ---
+// --- AI CHATBOT (NO CHANGES NEEDED) ---
 export const chatbot = async (req, res) => {
     const { message } = req.body;
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
