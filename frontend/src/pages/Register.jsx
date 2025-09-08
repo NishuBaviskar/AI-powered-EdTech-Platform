@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import axios from 'axios';
+// BEFORE: import axios from 'axios';
+import api from '../api'; // AFTER: We now use our centralized, smart API client.
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
@@ -18,7 +19,8 @@ const Register = () => {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await axios.post('/api/auth/register', formData);
+            // This now correctly calls https://edtech-backend-nishu.onrender.com/api/auth/register
+            const res = await api.post('/auth/register', formData);
             
             if (res.data && res.data.token) {
                 localStorage.setItem('token', res.data.token);
