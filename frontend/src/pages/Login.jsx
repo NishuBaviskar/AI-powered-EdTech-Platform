@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import axios from 'axios';
+// BEFORE: import axios from 'axios';
+import api from '../api'; // AFTER: We now use our centralized, smart API client.
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
@@ -18,15 +19,14 @@ const Login = () => {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await axios.post('/api/auth/login', formData);
+            // This now correctly calls https://edtech-backend-nishu.onrender.com/api/auth/login
+            const res = await api.post('/auth/login', formData);
             
-            // This check is still good practice to ensure the token exists before proceeding
             if (res.data && res.data.token) {
                 localStorage.setItem('token', res.data.token);
                 toast.success('Logged in successfully!');
                 navigate('/dashboard');
             } else {
-                // This will only trigger if the backend has a catastrophic failure
                 throw new Error("Token was not received from server.");
             }
         } catch (err) {
