@@ -130,53 +130,35 @@ import jwt from 'jsonwebtoken';
 import pool from '../models/db.js';
 import fetch from 'node-fetch';
 
-// --- REGISTER A NEW USER (FINAL, PERMANENTLY FIXED VERSION) ---
+// --- REGISTER A NEW USER ---
 export const register = async (req, res) => {
     const { username, email, password } = req.body;
-    
     if (!username || !email || !password) {
         return res.status(400).json({ message: "Username, email, and password are required." });
     }
-
     try {
         const [existingUser] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
         if (existingUser.length > 0) {
             return res.status(400).json({ message: 'User with this email already exists' });
         }
-
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-
         const [newUser] = await pool.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, hashedPassword]);
         const payload = { user: { id: newUser.insertId } };
-
-        // This Promise structure ensures the function waits for the token to be created
         const token = await new Promise((resolve, reject) => {
-            jwt.sign(
-                payload,
-                process.env.JWT_SECRET,
-                { expiresIn: '5h' },
-                (err, generatedToken) => {
-                    if (err) {
-                        console.error("--- BACKEND CRITICAL ERROR: JWT Signing Failed during registration ---", err);
-                        return reject(err);
-                    }
-                    resolve(generatedToken);
-                }
-            );
+            jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, generatedToken) => {
+                if (err) return reject(err);
+                resolve(generatedToken);
+            });
         });
-        
-        // This is now guaranteed to run only after the token is created.
         res.status(201).json({ token });
-
     } catch (err) {
-        console.error("--- BACKEND CRITICAL ERROR in register controller ---", err);
+        console.error("Error in register controller:", err);
         res.status(500).send('Server error during registration');
     }
 };
 
-
-// --- LOG IN AN EXISTING USER (FINAL, CORRECTED VERSION) ---
+// --- LOG IN AN EXISTING USER ---
 export const login = async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -192,8 +174,6 @@ export const login = async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
         const payload = { user: { id: user[0].id } };
-
-        // This Promise structure ensures the function waits for the token to be created
         const token = await new Promise((resolve, reject) => {
             jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, generatedToken) => {
                 if (err) return reject(err);
@@ -202,34 +182,26 @@ export const login = async (req, res) => {
         });
         res.json({ token });
     } catch (err) {
-        console.error("--- BACKEND CRITICAL ERROR in login controller ---", err);
+        console.error("Error in login controller:", err);
         res.status(500).send('Server error during login');
     }
 };
 
-
-// --- AI CHATBOT (FINAL, CLEANED VERSION) ---
+// --- AI CHATBOT (CORRECTED MODEL) ---
 export const chatbot = async (req, res) => {
     const { message } = req.body;
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-    // This is the "bulletproof check" to ensure the API key is loaded.
     if (!GEMINI_API_KEY) {
-        console.error("FATAL ERROR in chatbot: GEMINI_API_KEY is missing from environment variables.");
+        console.error("FATAL ERROR in chatbot: GEMINI_API_KEY is missing.");
         return res.status(500).json({ message: "Server misconfiguration: AI service is unavailable." });
     }
     
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+    // Using the stable 'gemini-pro' model
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
     
-    const systemPrompt = "You are a friendly and encouraging AI tutor for students. Keep your answers concise, helpful, and easy to understand. Your name is Sparky.";
-
-    const payload = {
-        contents: [{ parts: [{ text: systemPrompt }, { text: `Student question: ${message}` }] }],
-        generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 250,
-        },
-    };
+    const systemPrompt = "You are a friendly AI tutor named Sparky. Keep answers concise and helpful.";
+    const payload = { contents: [{ parts: [{ text: systemPrompt }, { text: `Student question: ${message}` }] }] };
 
     try {
         const apiResponse = await fetch(API_URL, {
