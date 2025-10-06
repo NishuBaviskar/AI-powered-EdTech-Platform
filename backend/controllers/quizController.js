@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+/*import fetch from 'node-fetch';
 
 const shuffleArray = (array) => {
     for (let i = array.length - 1; i > 0; i--) {
@@ -64,6 +64,65 @@ export const getQuizQuestions = async(req, res) => {
         console.error("--- DEBUG: CRITICAL ERROR in quizController ---");
         console.error(error.message);
         console.error("---------------------------------------------");
+        res.status(500).json({ message: "Failed to generate quiz from the AI model." });
+    }
+};*/
+
+import fetch from 'node-fetch';
+
+// Helper function to shuffle array elements
+const shuffleArray = (array) => {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+};
+
+export const getQuizQuestions = async (req, res) => {
+    const { subject } = req.params;
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+    if (!GEMINI_API_KEY) {
+        console.error("FATAL ERROR in quizController: GEMINI_API_KEY is missing.");
+        return res.status(500).json({ message: "Server misconfiguration: Quiz service is unavailable." });
+    }
+    
+    // Using the stable 'gemini-pro' model
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const systemPrompt = `Create 10 multiple-choice questions about "${subject}". Respond ONLY with a valid JSON array of objects (keys: "question", "options" [array of 4 strings], and "correct_answer").`;
+
+    const payload = {
+        contents: [{ parts: [{ text: systemPrompt }] }]
+    };
+
+    try {
+        const apiResponse = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const responseData = await apiResponse.json();
+        if (!apiResponse.ok || !responseData.candidates) {
+            console.error("Gemini API Error for Quizzes:", responseData);
+            throw new Error("API call failed or returned no candidates.");
+        }
+        
+        let jsonString = responseData.candidates[0].content.parts[0].text;
+        jsonString = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        const generatedQuestions = JSON.parse(jsonString);
+        
+        const shuffledQuestions = generatedQuestions.map(q => ({
+            ...q,
+            options: shuffleArray(q.options)
+        }));
+        
+        res.json(shuffledQuestions);
+    } catch (error) {
+        console.error("Error fetching quiz from Gemini API:", error);
         res.status(500).json({ message: "Failed to generate quiz from the AI model." });
     }
 };
