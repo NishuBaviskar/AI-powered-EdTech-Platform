@@ -85,8 +85,13 @@ export const chatbot = async (req, res) => {
     const { message } = req.body;
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-    if (!GEMINI_API_KEY) {
+    /*if (!GEMINI_API_KEY) {
         return res.status(500).send("Server is missing Gemini API Key.");
+    }*/
+    // --- THIS IS THE BULLETPROOF CHECK ---
+    if (!GEMINI_API_KEY) {
+        console.error("FATAL ERROR in chatbot: GEMINI_API_KEY is missing from environment variables.");
+        return res.status(500).json({ message: "Server misconfiguration: AI service is unavailable." });
     }
     
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
