@@ -150,6 +150,7 @@ export const register = async (req, res) => {
         const [newUser] = await pool.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, hashedPassword]);
         const payload = { user: { id: newUser.insertId } };
 
+        // This Promise structure ensures the function waits for the token to be created
         const token = await new Promise((resolve, reject) => {
             jwt.sign(
                 payload,
@@ -165,6 +166,7 @@ export const register = async (req, res) => {
             );
         });
         
+        // This is now guaranteed to run only after the token is created.
         res.status(201).json({ token });
 
     } catch (err) {
@@ -190,6 +192,8 @@ export const login = async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
         const payload = { user: { id: user[0].id } };
+
+        // This Promise structure ensures the function waits for the token to be created
         const token = await new Promise((resolve, reject) => {
             jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, generatedToken) => {
                 if (err) return reject(err);
