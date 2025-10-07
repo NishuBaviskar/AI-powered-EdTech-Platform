@@ -110,7 +110,7 @@ export const generateMaterial = async (req, res) => {
 
     try {
         const payload = {
-            model: "llama3-70b-8192",
+            model: "gemma-7b-it",
             messages: [{ role: "system", content: systemPrompt }]
         };
         const apiResponse = await fetch(API_URL, {
