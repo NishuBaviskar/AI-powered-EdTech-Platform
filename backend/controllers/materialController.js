@@ -92,8 +92,7 @@ export const generateMaterial = async (req, res) => {
         return res.status(500).json({ message: "Server misconfiguration: Material service is unavailable." });
     }
 
-    // Using the stable 'gemini-pro' model
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
 
     let systemPrompt = '';
     switch (materialType) {
@@ -117,9 +116,15 @@ export const generateMaterial = async (req, res) => {
             body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] })
         });
 
+        if (!apiResponse.ok) {
+            const errorBody = await apiResponse.text();
+            console.error("--- GEMINI API FAILED (Material) ---", errorBody);
+            throw new Error(`API call failed with status: ${apiResponse.status}`);
+        }
         const responseData = await apiResponse.json();
-        if (!apiResponse.ok || !responseData.candidates) {
-            throw new Error(`API call failed. Status: ${apiResponse.status}`);
+        
+        if (!responseData.candidates) {
+            throw new Error("API call succeeded but returned no candidates.");
         }
         
         let content = responseData.candidates[0].content.parts[0].text;
