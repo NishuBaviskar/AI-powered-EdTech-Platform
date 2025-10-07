@@ -200,7 +200,7 @@ export const chatbot = async (req, res) => {
     const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
     
     const payload = {
-        model: "llama3-70b-8192", // A powerful and fast model from Groq
+        model: "gemma-7b-it", // A powerful and fast model from Groq
         messages: [
             { role: "system", content: "You are a friendly and encouraging AI tutor named Sparky. Keep answers concise and helpful." },
             { role: "user", content: message }
