@@ -43,37 +43,24 @@ export const getCourses = async (req, res) => {
         return res.status(500).json({ message: "Server misconfiguration: Course service is unavailable." });
     }
     
+    // --- THIS IS THE CRITICAL FIX ---
+    // We are now using the stable 'v1' endpoint.
     const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
     
-    const systemPrompt = `Find 5-7 online courses for "${topic}" from platforms like Coursera, Udemy, edX, etc. Respond ONLY with a valid JSON array of objects (keys: "source", "title", "description", "url").`;
-
-    const payload = {
-        contents: [{ parts: [{ text: systemPrompt }] }]
-    };
+    const systemPrompt = `Find 5-7 online courses for "${topic}" from platforms like Coursera, Udemy, edX. Respond ONLY with a valid JSON array of objects (keys: "source", "title", "description", "url").`;
+    const payload = { contents: [{ parts: [{ text: systemPrompt }] }] };
 
     try {
-        const apiResponse = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
+        const apiResponse = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         if (!apiResponse.ok) {
             const errorBody = await apiResponse.text();
             console.error("--- GEMINI API FAILED (Courses) ---", errorBody);
             throw new Error(`API call failed with status: ${apiResponse.status}`);
         }
         const responseData = await apiResponse.json();
-        
-        if (!responseData.candidates) {
-            throw new Error("API call succeeded but returned no candidates.");
-        }
-        
-        let jsonString = responseData.candidates[0].content.parts[0].text;
-        jsonString = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
-        
-        const formattedCourses = JSON.parse(jsonString);
-        res.json(formattedCourses);
+        if (!responseData.candidates) throw new Error("API call succeeded but returned no candidates.");
+        let jsonString = responseData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+        res.json(JSON.parse(jsonString));
     } catch (error) {
         console.error("Error fetching courses from Gemini API:", error);
         res.status(500).json({ message: "Failed to fetch courses from the AI model." });
