@@ -36,33 +36,36 @@ import fetch from 'node-fetch';
 
 export const getCourses = async (req, res) => {
     const { topic } = req.params;
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-    if (!GEMINI_API_KEY) {
-        console.error("FATAL ERROR in courseController: GEMINI_API_KEY is missing.");
+    if (!GROQ_API_KEY) {
+        console.error("FATAL ERROR in courseController: GROQ_API_KEY is missing.");
         return res.status(500).json({ message: "Server misconfiguration: Course service is unavailable." });
     }
     
-    // --- THIS IS THE CRITICAL FIX ---
-    // We are now using the stable 'v1' endpoint.
-    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
-    
+    const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
     const systemPrompt = `Find 5-7 online courses for "${topic}" from platforms like Coursera, Udemy, edX. Respond ONLY with a valid JSON array of objects (keys: "source", "title", "description", "url").`;
-    const payload = { contents: [{ parts: [{ text: systemPrompt }] }] };
+    const payload = {
+        model: "llama3-70b-8192",
+        messages: [{ role: "system", content: systemPrompt }]
+    };
 
     try {
-        const apiResponse = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const apiResponse = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
         if (!apiResponse.ok) {
             const errorBody = await apiResponse.text();
-            console.error("--- GEMINI API FAILED (Courses) ---", errorBody);
+            console.error("--- GROQ API FAILED (Courses) ---", errorBody);
             throw new Error(`API call failed with status: ${apiResponse.status}`);
         }
         const responseData = await apiResponse.json();
-        if (!responseData.candidates) throw new Error("API call succeeded but returned no candidates.");
-        let jsonString = responseData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+        let jsonString = responseData.choices[0]?.message?.content.replace(/```json/g, '').replace(/```/g, '').trim();
         res.json(JSON.parse(jsonString));
     } catch (error) {
-        console.error("Error fetching courses from Gemini API:", error);
+        console.error("Error fetching courses from Groq API:", error);
         res.status(500).json({ message: "Failed to fetch courses from the AI model." });
     }
 };
