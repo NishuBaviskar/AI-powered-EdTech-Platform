@@ -92,7 +92,7 @@ export const getQuizQuestions = async (req, res) => {
     const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
     const systemPrompt = `Create 10 multiple-choice questions about "${subject}". Respond ONLY with a valid JSON array of objects (keys: "question", "options" [array of 4 strings], and "correct_answer").`;
     const payload = {
-        model: "llama3-70b-8192",
+        model: "gemma-7b-it",
         messages: [{ role: "system", content: systemPrompt }]
     };
 
