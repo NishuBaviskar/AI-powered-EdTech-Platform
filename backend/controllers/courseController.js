@@ -43,8 +43,7 @@ export const getCourses = async (req, res) => {
         return res.status(500).json({ message: "Server misconfiguration: Course service is unavailable." });
     }
     
-    // Using the stable 'gemini-pro' model
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
     
     const systemPrompt = `Find 5-7 online courses for "${topic}" from platforms like Coursera, Udemy, edX, etc. Respond ONLY with a valid JSON array of objects (keys: "source", "title", "description", "url").`;
 
@@ -59,10 +58,15 @@ export const getCourses = async (req, res) => {
             body: JSON.stringify(payload)
         });
 
+        if (!apiResponse.ok) {
+            const errorBody = await apiResponse.text();
+            console.error("--- GEMINI API FAILED (Courses) ---", errorBody);
+            throw new Error(`API call failed with status: ${apiResponse.status}`);
+        }
         const responseData = await apiResponse.json();
-        if (!apiResponse.ok || !responseData.candidates) {
-            console.error("Gemini API Error for Courses:", responseData);
-            throw new Error(responseData.error?.message || "API call failed.");
+        
+        if (!responseData.candidates) {
+            throw new Error("API call succeeded but returned no candidates.");
         }
         
         let jsonString = responseData.candidates[0].content.parts[0].text;
