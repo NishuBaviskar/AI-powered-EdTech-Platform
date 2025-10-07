@@ -130,62 +130,107 @@ import jwt from 'jsonwebtoken';
 import pool from '../models/db.js';
 import fetch from 'node-fetch';
 
+// --- REGISTER A NEW USER ---
 export const register = async (req, res) => {
     const { username, email, password } = req.body;
-    if (!username || !email || !password) return res.status(400).json({ message: "All fields are required." });
+    if (!username || !email || !password) {
+        return res.status(400).json({ message: "Username, email, and password are required." });
+    }
     try {
         const [existingUser] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-        if (existingUser.length > 0) return res.status(400).json({ message: 'User already exists' });
+        if (existingUser.length > 0) {
+            return res.status(400).json({ message: 'User with this email already exists' });
+        }
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
         const [newUser] = await pool.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, hashedPassword]);
         const payload = { user: { id: newUser.insertId } };
         const token = await new Promise((resolve, reject) => {
-            jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, token) => err ? reject(err) : resolve(token));
+            jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, generatedToken) => {
+                if (err) return reject(err);
+                resolve(generatedToken);
+            });
         });
         res.status(201).json({ token });
     } catch (err) {
-        console.error("Register Error:", err);
-        res.status(500).send('Server error');
+        console.error("Error in register controller:", err);
+        res.status(500).send('Server error during registration');
     }
 };
 
+// --- LOG IN AN EXISTING USER ---
 export const login = async (req, res) => {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ message: "All fields are required." });
+    if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required." });
+    }
     try {
         const [user] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-        if (user.length === 0) return res.status(400).json({ message: 'Invalid credentials' });
+        if (user.length === 0) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
         const isMatch = await bcrypt.compare(password, user[0].password);
-        if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
         const payload = { user: { id: user[0].id } };
         const token = await new Promise((resolve, reject) => {
-            jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, token) => err ? reject(err) : resolve(token));
+            jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, generatedToken) => {
+                if (err) return reject(err);
+                resolve(generatedToken);
+            });
         });
         res.json({ token });
     } catch (err) {
-        console.error("Login Error:", err);
-        res.status(500).send('Server error');
+        console.error("Error in login controller:", err);
+        res.status(500).send('Server error during login');
     }
 };
 
+// --- AI CHATBOT (WITH DETAILED ERROR LOGGING) ---
 export const chatbot = async (req, res) => {
     const { message } = req.body;
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
     if (!GEMINI_API_KEY) {
-        console.error("FATAL ERROR in chatbot: GEMINI_API_KEY is missing.");
+        console.error("FATAL ERROR in chatbot: GEMINI_API_KEY is missing from environment variables.");
         return res.status(500).json({ message: "Server misconfiguration: AI service is unavailable." });
     }
+    
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
-    const systemPrompt = "You are a friendly AI tutor named Sparky. Keep answers concise.";
+    
+    const systemPrompt = "You are a friendly AI tutor named Sparky. Keep answers concise and helpful.";
     const payload = { contents: [{ parts: [{ text: systemPrompt }, { text: `Student question: ${message}` }] }] };
+
     try {
-        const apiResponse = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        const responseData = await apiResponse.json();
-        if (!apiResponse.ok || !responseData.candidates) {
-            throw new Error(responseData.error?.message || `API call failed. Status: ${apiResponse.status}`);
+        const apiResponse = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        // --- NEW DETAILED ERROR LOGGING ---
+        // This is the critical debugging step.
+        if (!apiResponse.ok) {
+            // If the API call fails, we try to read the error body from Google and log it.
+            const errorBody = await apiResponse.text();
+            console.error("--- GEMINI API FAILED ---");
+            console.error("Status:", apiResponse.status);
+            console.error("Status Text:", apiResponse.statusText);
+            console.error("Response Body from Google:", errorBody);
+            console.error("-------------------------");
+            throw new Error(`API call failed with status: ${apiResponse.status}`);
         }
-        res.json({ reply: responseData.candidates[0].content.parts[0].text });
+
+        const responseData = await apiResponse.json();
+
+        if (!responseData.candidates || responseData.candidates.length === 0) {
+            console.error("Gemini API Error (Chatbot): Response was OK, but no candidates were returned.", responseData);
+            throw new Error("API call succeeded but returned no valid candidates.");
+        }
+        
+        const reply = responseData.candidates[0].content.parts[0].text;
+        res.json({ reply });
     } catch (err) {
         console.error('Error with Gemini API (Chatbot):', err.message);
         res.status(500).send('AI Chatbot error');
