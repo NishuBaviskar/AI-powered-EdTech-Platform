@@ -72,6 +72,7 @@ import fetch from 'node-fetch';
 
 // Helper function to shuffle array elements
 const shuffleArray = (array) => {
+    if (!array || !Array.isArray(array)) return [];
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
@@ -88,8 +89,7 @@ export const getQuizQuestions = async (req, res) => {
         return res.status(500).json({ message: "Server misconfiguration: Quiz service is unavailable." });
     }
     
-    // Using the stable 'gemini-pro' model
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
     
     const systemPrompt = `Create 10 multiple-choice questions about "${subject}". Respond ONLY with a valid JSON array of objects (keys: "question", "options" [array of 4 strings], and "correct_answer").`;
 
@@ -104,10 +104,15 @@ export const getQuizQuestions = async (req, res) => {
             body: JSON.stringify(payload)
         });
 
+        if (!apiResponse.ok) {
+            const errorBody = await apiResponse.text();
+            console.error("--- GEMINI API FAILED (Quiz) ---", errorBody);
+            throw new Error(`API call failed with status: ${apiResponse.status}`);
+        }
         const responseData = await apiResponse.json();
-        if (!apiResponse.ok || !responseData.candidates) {
-            console.error("Gemini API Error for Quizzes:", responseData);
-            throw new Error("API call failed or returned no candidates.");
+        
+        if (!responseData.candidates) {
+            throw new Error("API call succeeded but returned no candidates.");
         }
         
         let jsonString = responseData.candidates[0].content.parts[0].text;
