@@ -46,7 +46,7 @@ export const getCourses = async (req, res) => {
     const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
     const systemPrompt = `Find 5-7 online courses for "${topic}" from platforms like Coursera, Udemy, edX. Respond ONLY with a valid JSON array of objects (keys: "source", "title", "description", "url").`;
     const payload = {
-        model: "llama3-70b-8192",
+        model: "gemma-7b-it",
         messages: [{ role: "system", content: systemPrompt }]
     };
 
