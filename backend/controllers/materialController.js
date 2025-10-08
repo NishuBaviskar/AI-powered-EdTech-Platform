@@ -71,9 +71,13 @@ export const generateMaterial = async(req, res) => {
 import fetch from 'node-fetch';
 import pool from '../models/db.js';
 
+// Helper function to log activities
 const logActivity = async (userId, activityType, details = {}) => {
     try {
-        await pool.query('INSERT INTO user_activity (user_id, activity_type, details) VALUES (?, ?, ?)', [userId, activityType, JSON.stringify(details)]);
+        await pool.query(
+            'INSERT INTO user_activity (user_id, activity_type, details) VALUES (?, ?, ?)',
+            [userId, activityType, JSON.stringify(details)]
+        );
     } catch (error) {
         console.error(`Failed to log activity '${activityType}' for user ${userId}:`, error);
     }
@@ -83,13 +87,13 @@ export const generateMaterial = async (req, res) => {
     const { topic, materialType } = req.body;
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
+    // "Gatekeeper" check for the API key
     if (!GEMINI_API_KEY) {
-        console.error("FATAL ERROR in materialController: GEMINI_API_KEY is missing.");
+        console.error("FATAL ERROR in materialController: GEMINI_API_KEY is missing from environment variables.");
         return res.status(500).json({ message: "Server misconfiguration: Material service is unavailable." });
     }
 
-    // --- THIS IS THE CRITICAL FIX ---
-    // We are now using the stable 'v1' endpoint.
+    // Using the stable 'v1' endpoint and the latest flash model
     const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
 
     let systemPrompt = '';
@@ -108,14 +112,20 @@ export const generateMaterial = async (req, res) => {
     }
 
     try {
-        const apiResponse = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] }) });
+        const apiResponse = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] })
+        });
         if (!apiResponse.ok) {
             const errorBody = await apiResponse.text();
             console.error("--- GEMINI API FAILED (Material) ---", errorBody);
             throw new Error(`API call failed with status: ${apiResponse.status}`);
         }
         const responseData = await apiResponse.json();
-        if (!responseData.candidates) throw new Error("API call succeeded but returned no candidates.");
+        if (!responseData.candidates) {
+            throw new Error("API call succeeded but returned no candidates.");
+        }
         let content = responseData.candidates[0].content.parts[0].text;
         if (materialType === 'flashcards') {
             content = JSON.parse(content.replace(/```json/g, '').replace(/```/g, '').trim());
