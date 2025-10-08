@@ -71,13 +71,9 @@ export const generateMaterial = async(req, res) => {
 import fetch from 'node-fetch';
 import pool from '../models/db.js';
 
-// Helper function to log activities
 const logActivity = async (userId, activityType, details = {}) => {
     try {
-        await pool.query(
-            'INSERT INTO user_activity (user_id, activity_type, details) VALUES (?, ?, ?)',
-            [userId, activityType, JSON.stringify(details)]
-        );
+        await pool.query('INSERT INTO user_activity (user_id, activity_type, details) VALUES (?, ?, ?)', [userId, activityType, JSON.stringify(details)]);
     } catch (error) {
         console.error(`Failed to log activity '${activityType}' for user ${userId}:`, error);
     }
@@ -85,46 +81,42 @@ const logActivity = async (userId, activityType, details = {}) => {
 
 export const generateMaterial = async (req, res) => {
     const { topic, materialType } = req.body;
-    const GROQ_API_KEY = process.env.GROQ_API_KEY;
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-    if (!GROQ_API_KEY) {
-        console.error("FATAL ERROR in materialController: GROQ_API_KEY is missing.");
+    if (!GEMINI_API_KEY) {
+        console.error("FATAL ERROR in materialController: GEMINI_API_KEY is missing.");
         return res.status(500).json({ message: "Server misconfiguration: Material service is unavailable." });
     }
 
-    const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+    // --- THIS IS THE CRITICAL FIX ---
+    // We are now using the stable 'v1' endpoint.
+    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+
     let systemPrompt = '';
     switch (materialType) {
         case 'notes':
-            systemPrompt = `Generate a detailed study guide on: "${topic}". Use markdown: # for title, ## for headings, - for lists, and **text** for emphasis.`;
+            systemPrompt = `You are an academic assistant. Generate a detailed, well-structured study guide on: "${topic}". Use markdown: # for title, ## for headings, - for lists, and **text** for emphasis.`;
             break;
         case 'flashcards':
-            systemPrompt = `Generate 8 flashcards for "${topic}". Respond ONLY with a valid JSON array of objects (keys: "front", "back").`;
+            systemPrompt = `You are a flashcard creator. For "${topic}", generate exactly 8 flashcards. Respond ONLY with a valid JSON array of objects. Each object must have "front" and "back" keys.`;
             break;
         case 'summary':
-            systemPrompt = `Provide a concise summary of key concepts for "${topic}". Use clean paragraphs.`;
+            systemPrompt = `You are a summarization expert. Provide a concise summary of key concepts for "${topic}". Use clean paragraphs.`;
             break;
         default:
             return res.status(400).json({ message: "Invalid material type specified." });
     }
 
     try {
-        const payload = {
-            model: "gemma-7b-it",
-            messages: [{ role: "system", content: systemPrompt }]
-        };
-        const apiResponse = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        const apiResponse = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] }) });
         if (!apiResponse.ok) {
             const errorBody = await apiResponse.text();
-            console.error("--- GROQ API FAILED (Material) ---", errorBody);
+            console.error("--- GEMINI API FAILED (Material) ---", errorBody);
             throw new Error(`API call failed with status: ${apiResponse.status}`);
         }
         const responseData = await apiResponse.json();
-        let content = responseData.choices[0]?.message?.content;
+        if (!responseData.candidates) throw new Error("API call succeeded but returned no candidates.");
+        let content = responseData.candidates[0].content.parts[0].text;
         if (materialType === 'flashcards') {
             content = JSON.parse(content.replace(/```json/g, '').replace(/```/g, '').trim());
         }
