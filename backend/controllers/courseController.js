@@ -38,27 +38,33 @@ export const getCourses = async (req, res) => {
     const { topic } = req.params;
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
+    // "Gatekeeper" check for the API key
     if (!GEMINI_API_KEY) {
-        console.error("FATAL ERROR in courseController: GEMINI_API_KEY is missing.");
+        console.error("FATAL ERROR in courseController: GEMINI_API_KEY is missing from environment variables.");
         return res.status(500).json({ message: "Server misconfiguration: Course service is unavailable." });
     }
     
-    // --- THIS IS THE CRITICAL FIX ---
-    // We are now using the stable 'v1' endpoint.
+    // Using the stable 'v1' endpoint and the latest flash model
     const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
     
-    const systemPrompt = `Find 5-7 online courses for "${topic}" from platforms like Coursera, Udemy, edX. Respond ONLY with a valid JSON array of objects (keys: "source", "title", "description", "url").`;
+    const systemPrompt = `Find 5-7 online courses for "${topic}" from platforms like Coursera, Udemy, edX, etc. Respond ONLY with a valid JSON array of objects (keys: "source", "title", "description", "url").`;
     const payload = { contents: [{ parts: [{ text: systemPrompt }] }] };
 
     try {
-        const apiResponse = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const apiResponse = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
         if (!apiResponse.ok) {
             const errorBody = await apiResponse.text();
             console.error("--- GEMINI API FAILED (Courses) ---", errorBody);
             throw new Error(`API call failed with status: ${apiResponse.status}`);
         }
         const responseData = await apiResponse.json();
-        if (!responseData.candidates) throw new Error("API call succeeded but returned no candidates.");
+        if (!responseData.candidates) {
+            throw new Error("API call succeeded but returned no candidates.");
+        }
         let jsonString = responseData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
         res.json(JSON.parse(jsonString));
     } catch (error) {
