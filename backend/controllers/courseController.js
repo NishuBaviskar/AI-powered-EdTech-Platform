@@ -43,7 +43,6 @@ export const getCourses = async (req, res) => {
         return res.status(500).json({ message: "Server misconfiguration: Course service is unavailable." });
     }
     
-    // --- THIS IS THE CRITICAL FIX ---
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
     
     const systemPrompt = `Find 5-7 online courses for "${topic}" from platforms like Coursera, Udemy, edX. Respond ONLY with a valid JSON array of objects (keys: "source", "title", "description", "url").`;
