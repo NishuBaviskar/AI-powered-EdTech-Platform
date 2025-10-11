@@ -88,9 +88,7 @@ export const getQuizQuestions = async (req, res) => {
         return res.status(500).json({ message: "Server misconfiguration: Quiz service is unavailable." });
     }
     
-    // --- THIS IS THE CRITICAL FIX ---
-    // We are now using the stable 'v1' endpoint.
-    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
     
     const systemPrompt = `Create 10 multiple-choice questions about "${subject}". Respond ONLY with a valid JSON array of objects (keys: "question", "options" [array of 4 strings], and "correct_answer").`;
     const payload = { contents: [{ parts: [{ text: systemPrompt }] }] };
