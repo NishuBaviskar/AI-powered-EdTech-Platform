@@ -172,43 +172,25 @@ export const login = async (req, res) => {
 export const chatbot = async (req, res) => {
     const { message } = req.body;
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
     if (!GEMINI_API_KEY) {
-        console.error("FATAL ERROR in chatbot: GEMINI_API_KEY is missing from environment variables.");
+        console.error("FATAL ERROR in chatbot: GEMINI_API_KEY is missing.");
         return res.status(500).json({ message: "Server misconfiguration: AI service is unavailable." });
     }
-    
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
-    
     const systemPrompt = "You are a friendly AI tutor named Sparky. Keep answers concise and helpful.";
     const payload = { contents: [{ parts: [{ text: systemPrompt }, { text: `Student question: ${message}` }] }] };
-
     try {
-        const apiResponse = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        // --- NEW DETAILED ERROR LOGGING ---
+        const apiResponse = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         if (!apiResponse.ok) {
             const errorBody = await apiResponse.text();
-            console.error("--- GEMINI API FAILED ---");
-            console.error("Status:", apiResponse.status);
-            console.error("Response Body from Google:", errorBody);
-            console.error("-------------------------");
+            console.error("--- GEMINI API FAILED (Chatbot) ---", errorBody);
             throw new Error(`API call failed with status: ${apiResponse.status}`);
         }
-
         const responseData = await apiResponse.json();
-
         if (!responseData.candidates || responseData.candidates.length === 0) {
-            console.error("Gemini API Error (Chatbot): Response OK, but no candidates.", responseData);
             throw new Error("API call succeeded but returned no valid candidates.");
         }
-        
-        const reply = responseData.candidates[0].content.parts[0].text;
-        res.json({ reply });
+        res.json({ reply: responseData.candidates[0].content.parts[0].text });
     } catch (err) {
         console.error('Error with Gemini API (Chatbot):', err.message);
         res.status(500).send('AI Chatbot error');
