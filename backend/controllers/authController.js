@@ -130,7 +130,6 @@ import jwt from 'jsonwebtoken';
 import pool from '../models/db.js';
 import fetch from 'node-fetch';
 
-// --- REGISTER AND LOGIN FUNCTIONS ARE CORRECT AND DO NOT NEED CHANGES ---
 export const register = async (req, res) => {
     const { username, email, password } = req.body;
     if (!username || !email || !password) return res.status(400).json({ message: "All fields are required." });
@@ -170,20 +169,14 @@ export const login = async (req, res) => {
     }
 };
 
-// --- CORRECTED AI CHATBOT FUNCTION (USING STABLE v1 API) ---
 export const chatbot = async (req, res) => {
     const { message } = req.body;
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
     if (!GEMINI_API_KEY) {
         console.error("FATAL ERROR in chatbot: GEMINI_API_KEY is missing.");
         return res.status(500).json({ message: "Server misconfiguration: AI service is unavailable." });
     }
-    
-    // --- THIS IS THE CRITICAL FIX ---
-    // We are now using the stable 'v1' endpoint and the latest flash model.
-    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
-    
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
     const systemPrompt = "You are a friendly AI tutor named Sparky. Keep answers concise and helpful.";
     const payload = { contents: [{ parts: [{ text: systemPrompt }, { text: `Student question: ${message}` }] }] };
     try {
